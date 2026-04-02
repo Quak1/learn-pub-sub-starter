@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -26,21 +25,42 @@ func main() {
 		log.Fatal("could not create channel: ", err)
 	}
 
-	err = pubsub.PublishJSON(
-		pubCh,
+	gamelogic.PrintServerHelp()
+
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		switch words[0] {
+		case "pause":
+			fmt.Println("Sending pause message...")
+			err := sendPause(pubCh, true)
+			if err != nil {
+				fmt.Println("Error sending pause message: ", err)
+			}
+		case "resume":
+			fmt.Println("Sending resume message...")
+			err := sendPause(pubCh, false)
+			if err != nil {
+				fmt.Println("Error sending resume message: ", err)
+			}
+		case "quit":
+			fmt.Println("Server is shutting down")
+			return
+		default:
+			fmt.Println("I don't understand this command")
+		}
+	}
+}
+
+func sendPause(ch *amqp.Channel, isPaused bool) error {
+	return pubsub.PublishJSON(
+		ch,
 		routing.ExchangePerilDirect,
 		routing.PauseKey,
 		routing.PlayingState{
-			IsPaused: true,
+			IsPaused: isPaused,
 		})
-	if err != nil {
-		fmt.Println("could not publish data: ", err)
-	}
-	fmt.Println("Message sent")
-
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt)
-	<-signalCh
-
-	fmt.Println("Server is shutting down")
 }
