@@ -62,7 +62,7 @@ func main() {
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.SimpleQueueDurable,
-		handlerWar(gs),
+		handlerWar(gs, moveCh),
 	)
 	if err != nil {
 		log.Fatal("error registering function to queue: ", err)
