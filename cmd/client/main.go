@@ -20,6 +20,11 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Connection to RabbitMQ was successful")
 
+	moveCh, err := conn.Channel()
+	if err != nil {
+		log.Fatal("error creating move channel")
+	}
+
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatal(err)
@@ -45,15 +50,22 @@ func main() {
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
+		handlerMove(gs, moveCh),
 	)
 	if err != nil {
 		log.Fatal("error registering function to queue: ", err)
 	}
 
-	moveCh, err := conn.Channel()
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs),
+	)
 	if err != nil {
-		log.Fatal("error creating move channel")
+		log.Fatal("error registering function to queue: ", err)
 	}
 
 	for {
