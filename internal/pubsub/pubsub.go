@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -56,4 +57,42 @@ func DeclareAndBind(
 	}
 
 	return ch, queue, nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T),
+) error {
+	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return err
+	}
+
+	deliveryCh, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for msg := range deliveryCh {
+			var data T
+			if err = json.Unmarshal(msg.Body, &data); err != nil {
+				fmt.Println("couldn't unmarshal data: ", err)
+				continue
+			}
+
+			handler(data)
+
+			err := msg.Ack(false)
+			if err != nil {
+				fmt.Println("acknowledgement error: ", err)
+			}
+		}
+	}()
+
+	return nil
 }

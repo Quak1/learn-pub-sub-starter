@@ -20,12 +20,7 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Connection to RabbitMQ was successful")
 
-	pubCh, err := conn.Channel()
-	if err != nil {
-		log.Fatal("could not create channel: ", err)
-	}
-
-	_, q, err := pubsub.DeclareAndBind(
+	pubCh, q, err := pubsub.DeclareAndBind(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,

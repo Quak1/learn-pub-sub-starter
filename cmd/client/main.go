@@ -25,19 +25,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, q, err := pubsub.DeclareAndBind(
+	gs := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
-		fmt.Sprintf("%s.%s", routing.PauseKey, username),
+		routing.PauseKey+"."+username,
 		routing.PauseKey,
 		pubsub.SimpleQueueTransient,
+		handlerPause(gs),
 	)
 	if err != nil {
-		log.Fatal("could not create and bind queue: ", err)
+		log.Fatal("error registering function to queue: ", err)
 	}
-	fmt.Println("queue declared: ", q.Name)
-
-	gs := gamelogic.NewGameState(username)
 
 	for {
 		words := gamelogic.GetInput()
@@ -70,5 +70,12 @@ func main() {
 		default:
 			fmt.Println("I don't understand this command")
 		}
+	}
+}
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(ps)
 	}
 }
