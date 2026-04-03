@@ -39,6 +39,23 @@ func main() {
 		log.Fatal("error registering function to queue: ", err)
 	}
 
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.ArmyMovesPrefix+"."+username,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.SimpleQueueTransient,
+		handlerMove(gs),
+	)
+	if err != nil {
+		log.Fatal("error registering function to queue: ", err)
+	}
+
+	moveCh, err := conn.Channel()
+	if err != nil {
+		log.Fatal("error creating move channel")
+	}
+
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -57,7 +74,7 @@ func main() {
 				fmt.Println("error moving units: ", err)
 				continue
 			}
-			fmt.Printf("%s: Movement to %s was successful\n", move.Player.Username, move.ToLocation)
+			pubsub.PublishJSON(moveCh, routing.ExchangePerilTopic, routing.ArmyMovesPrefix+"."+username, move)
 		case "status":
 			gs.CommandStatus()
 		case "help":
@@ -77,5 +94,12 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 	return func(ps routing.PlayingState) {
 		defer fmt.Print("> ")
 		gs.HandlePause(ps)
+	}
+}
+
+func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
+	return func(am gamelogic.ArmyMove) {
+		defer fmt.Print("> ")
+		gs.HandleMove(am)
 	}
 }
