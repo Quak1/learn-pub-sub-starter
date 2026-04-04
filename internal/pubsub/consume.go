@@ -113,6 +113,11 @@ func SubscribeGob[T any](
 		return err
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("couldn't set qos: ", err)
+	}
+
 	deliveryCh, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return err
