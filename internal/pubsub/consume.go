@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -79,6 +81,51 @@ func SubscribeJSON[T any](
 		for msg := range deliveryCh {
 			var data T
 			if err = json.Unmarshal(msg.Body, &data); err != nil {
+				fmt.Println("couldn't unmarshal data: ", err)
+				continue
+			}
+
+			switch handler(data) {
+			case Ack:
+				msg.Ack(false)
+			case NackRequeue:
+				msg.Nack(false, true)
+			case NackDiscard:
+				msg.Nack(false, false)
+			default:
+			}
+		}
+	}()
+
+	return nil
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	ch, q, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return err
+	}
+
+	deliveryCh, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer ch.Close()
+
+		for msg := range deliveryCh {
+			var data T
+			buffer := bytes.NewBuffer(msg.Body)
+			decoder := gob.NewDecoder(buffer)
+			if err := decoder.Decode(&data); err != nil {
 				fmt.Println("couldn't unmarshal data: ", err)
 				continue
 			}

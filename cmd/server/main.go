@@ -20,17 +20,22 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Connection to RabbitMQ was successful")
 
-	pubCh, q, err := pubsub.DeclareAndBind(
+	pubCh, err := conn.Channel()
+	if err != nil {
+		log.Fatal("Error creating channel: ", err)
+	}
+
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.SimpleQueueDurable,
+		handlerGameLog,
 	)
 	if err != nil {
 		log.Fatal("could not create and bind queue: ", err)
 	}
-	fmt.Println("queue declared: ", q.Name)
 
 	gamelogic.PrintServerHelp()
 
